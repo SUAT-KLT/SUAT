@@ -1,0 +1,80 @@
+#!C:\Users\smirnovba\PycharmProjects\PythonProject\.venv\Scripts\python.exe
+# -*- coding: utf-8 -*-
+from __future__ import print_function
+
+import argparse
+import getpass
+import json
+import socket
+import sys
+from os import environ
+
+import sendgrid
+
+parser = argparse.ArgumentParser(prog='sendgrid-mail',
+                                 description='Send an email via Sendgrid.')
+
+env_username = environ.get('SENDGRID_USERNAME')
+env_password = environ.get('SENDGRID_PASSWORD')
+
+parser.add_argument('--username', dest='username', default=env_username,
+                    help='sendgrid username, defaults to $SENDGRID_USERNAME',
+                    required=not bool(env_username))
+parser.add_argument('--password', dest='password', default=env_password,
+                    help='sendgrid password, defaults to $SENDGRID_PASSWORD',
+                    required=not bool(env_password))
+
+parser.add_argument('--to', action='append', help='to email address',
+                    required=True)
+parser.add_argument('--from', help='from email address, defaults to local',
+                    default='%s@%s' % (getpass.getuser(), socket.getfqdn()))
+parser.add_argument('--cc', action='append', help='cc email address',
+                    default=[])
+parser.add_argument('--bcc', action='append', help='bcc email address',
+                    default=[])
+parser.add_argument('--subject', help='email subject', required=True)
+parser.add_argument('--attachment', action='append', help='attachment',
+                    type=argparse.FileType('r'), default=[])
+parser.add_argument('--html', help='send text as html', action='store_true',
+                    default=False)
+parser.add_argument('text', type=argparse.FileType('r'), nargs='?',
+                    default=sys.stdin)
+
+args = parser.parse_args()
+
+if not args.username:
+    print('username is required')
+    sys.exit(1)
+
+if not args.password:
+    print('password is required')
+    sys.exit(1)
+
+client = sendgrid.SendGridClient(args.username, args.password)
+message = sendgrid.Mail()
+message.set_from(getattr(args, 'from'))
+message.set_subject(args.subject)
+if args.html:
+    message.set_html(args.text.read())
+else:
+    message.set_text(args.text.read())
+
+for to in args.to:
+    message.add_to(to)
+
+for cc in args.cc:
+    message.add_cc(cc)
+
+for bcc in args.bcc:
+    message.add_bcc(bcc)
+
+for attachment in args.attachment:
+    message.add_attachment(attachment.name, attachment)
+
+status, msg = client.send(message)
+msg = json.loads(msg)
+
+if status != 200:
+    for error in msg.get('errors', []):
+        print(error)
+    sys.exit(1)
