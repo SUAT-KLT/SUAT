@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>СУАТ ООО "КУЛТУМИНСКОЕ"</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+    <style>
+        .hidden { display: none; }
+        .requests-feed {
+            max-height: 500px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .request-card {
+            transition: all 0.3s;
+            margin-bottom: 15px;
+        }
+        .request-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .status-pending { background-color: #fff3cd; }
+        .status-approved { background-color: #d4edda; }
+        .status-rejected { background-color: #f8d7da; }
+        #bookingFormContainer {
+            margin-bottom: 30px;
+        }
+        .status-canceled {
+            background-color: #e9ecef;
+            opacity: 0.8;
+        }
+        .comment-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 0 4px 4px 0;
+        }
+        .action-buttons {
+            margin-top: 10px;
+        }
+        .attachment-badge {
+            cursor: pointer;
+        }
+        .attachment-preview {
+            max-width: 100%;
+            max-height: 300px;
+            margin-top: 10px;
+        }
+    .attachment-modal {
+        width: 100%;
+        height: 100%;
+    }
+    .attachment-modal iframe {
+        width: 100%;
+        height: 100%;
+        min-height: 70vh;
+        border: none;
+    }
+    .modal-content {
+        height: 90vh;
+    }
+    .modal-body {
+        overflow: hidden;
+    }
+        .zoom-controls {
+    display: flex;
+    align-items: center;
+}
+
+.file-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-fullscreen .file-container {
+    height: calc(100vh - 120px);
+}
+        #imageViewerContainer {
+    touch-action: none;
+    user-select: none;
+}
+
+.notification-item {
+    transition: all 0.3s ease;
+    border-radius: 4px;
+}
+
+.notification-item:hover {
+    background-color: #f8f9fa;
+}
+
+.mark-as-read-btn {
+    opacity: 0.5;
+    transition: opacity 0.3s;
+}
+
+.mark-as-read-btn:hover {
+    opacity: 1;
+}
+
+#notificationsContainer {
+    max-height: 400px;
+    overflow-y: auto;
+}
+.dropdown-menu {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.image-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#attachmentImage {
+    transition: transform 0.1s ease;
+    cursor: grab;
+}
+
+.zoom-controls {
+    display: flex;
+    align-items: center;
+}
+
+/* Стили для логотипа */
+.navbar-brand {
+    display: flex;
+    align-items: center;
+}
+.logo-container {
+    background-color: white;
+    padding: 5px;
+    border-radius: 4px;
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+}
+.logo {
+    height: 40px;
+}
+
+/* Новые стили для уведомлений в правом верхнем углу */
+.notifications-wrapper {
+    display: flex;
+    align-items: center;
+    margin-right: 10px;
+}
+.notifications-dropdown {
+    margin-right: 10px;
+}
+
+/* Стили для уведомлений в выпадающем списке */
+.notification-dropdown-item {
+    white-space: normal;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid #eee;
+}
+.notification-message {
+    font-size: 0.9rem;
+    margin-bottom: 0.2rem;
+}
+.notification-time {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+.notification-unread {
+    background-color: #f8f9fa;
+}
+</style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+            <div class="logo-container">
+                <img src="/static/logo.png" alt="Логотип" class="logo">
+            </div>
+            СУАТ ООО "КУЛТУМИНСКОЕ"
+        </a>
+
+        {% if is_dispatcher %}
+            <a href="{{ url_for('transport_table') }}" class="btn btn-outline-light me-2">Забронированный транспорт</a>
+        {% endif %}
+        <div class="d-flex align-items-center">
+            {% if logged_in %}
+                {% if is_admin %}
+                    <a href="{{ url_for('manage_users') }}" class="btn btn-outline-light me-2">Управление пользователями</a>
+                {% endif %}
+                {% if is_dispatcher %}
+                    <a href="{{ url_for('dispatcher_requests') }}" class="btn btn-outline-light me-2">Управление заявками</a>
+                    <a href="{{ url_for('dispatcher_transport') }}" class="btn btn-outline-light me-2">Список транспорта</a>
+                {% endif %}
+                <a href="{{ url_for('change_own_password') }}" class="btn btn-outline-warning me-2">Изменить пароль</a>
+                <span class="navbar-text me-3">Вы вошли как: {{ form.surname.data }} {{ form.firstname.data }}</span>
+
+                <!-- Блок уведомлений -->
+                <div class="notifications-wrapper">
+                                    <div class="dropdown notifications-dropdown">
+                                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="notificationsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                            Уведомления
+                                            {% if notifications %}
+                                                <span id="notificationBadge" class="badge bg-danger">{{ notifications|length }}</span>
+                                            {% else %}
+                                                <span id="notificationBadge" class="badge bg-danger hidden">0</span>
+                                            {% endif %}
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationsDropdown" style="min-width: 300px;" id="notificationsDropdownMenu">
+                                            <li><h6 class="dropdown-header">Последние уведомления</h6></li>
+                                            {% if notifications %}
+                                                {% for notification in notifications %}
+                                                <li>
+                                                    <a class="dropdown-item notification-dropdown-item {% if not notification.is_read %}notification-unread{% endif %}" href="#">
+                                                        <div class="notification-message">{{ notification.message }}</div>
+                                                        <div class="notification-time">{{ notification.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+                                                    </a>
+                                                </li>
+                                                {% endfor %}
+                                            {% else %}
+                                                <li><a class="dropdown-item" href="#">Нет новых уведомлений</a></li>
+                                            {% endif %}
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item text-center" href="{{ url_for('notifications_page') }}">Все уведомления</a></li>
+                                            {% if notifications %}
+                                            <li><a class="dropdown-item text-center" href="#" id="markAllAsRead">Пометить все как прочитанные</a></li>
+                                            {% endif %}
+                                        </ul>
+                                    </div>
+                                    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Выйти</a>
+                                </div>
+                            {% else %}
+                                <a href="{{ url_for('login') }}" class="btn btn-outline-light">Войти</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">Система бронирования транспорта</h1>
+
+        <div class="d-flex mb-4">
+            <button class="btn btn-primary" id="newBookingBtn">Новая заявка</button>
+
+            {% if is_admin %}
+                <a href="{{ url_for('add_user') }}" class="btn btn-success ms-2">Добавить пользователя</a>
+            {% endif %}
+        </div>
+
+            <div id="bookingFormContainer" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Новая заявка на транспорт</h5>
+                </div>
+                <div class="card-body">
+                    <form id="bookingForm" enctype="multipart/form-data">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="surname" class="form-label">Фамилия</label>
+                                <input type="text" class="form-control" id="surname" required value="{{ form.surname.data }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="firstname" class="form-label">Имя</label>
+                                <input type="text" class="form-control" id="firstname" required value="{{ form.firstname.data }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="secondname" class="form-label">Отчество</label>
+                                <input type="text" class="form-control" id="secondname" value="{{ form.secondname.data }}">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="department" class="form-label">Подразделение</label>
+                                <input type="text" class="form-control" id="department" required value="{{ form.department.data }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="job_title" class="form-label">Должность</label>
+                                <input type="text" class="form-control" id="job_title" required value="{{ form.job_title.data }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                        <label for="transport_id" class="form-label">Транспорт</label>
+                        <select class="form-select select2" id="transport_id" required>
+                            {% set unique_transports = [] %}
+                            {% for transport in transports %}
+                                {% if transport.tsname not in unique_transports|map(attribute='tsname') %}
+                                    {% set _ = unique_transports.append(transport) %}
+                                    <option value="{{ transport.transport_id }}" data-requires-attachment="{{ transport.requires_attachment }}">
+                                        {{ transport.tsname }}
+                                    </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                        <div class="mb-3">
+                            <label for="phone_number" class="form-label">Телефон</label>
+                            <input type="tel" class="form-control" id="phone_number" placeholder="+7(XXX)XXX-XX-XX" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="purpose" class="form-label">Цель поездки</label>
+                            <textarea class="form-control" id="purpose" rows="3" required></textarea>
+                        </div>
+
+                        <div class="mb-3" id="attachmentContainer">
+    <label for="attachment" class="form-label">Прикрепить скан документа для спец. техники</label>
+
+    <!-- Добавьте этот чекбокс -->
+    <div class="form-check mb-2" id="useWithoutInstallationContainer" style="display: none;">
+        <input class="form-check-input" type="checkbox" id="use_without_installation" name="use_without_installation">
+        <label class="form-check-label" for="use_without_installation">
+            Использовать без установки
+        </label>
+        <div class="form-text">При выборе этой опции документ прикладывать не нужно</div>
+    </div>
+
+    <input type="file" class="form-control" id="attachment" name="attachment">
+    <div class="form-text">Допустимые форматы: PDF, JPG, JPEG, PNG</div>
+</div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="loc_from" class="form-label">Место подачи</label>
+                                <input type="text" class="form-control" id="loc_from" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="loc_to" class="form-label">Место назначения</label>
+                                <input type="text" class="form-control" id="loc_to" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="booking_datetime" class="form-label">Начало</label>
+                                <input type="datetime-local" class="form-control" id="booking_datetime" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="booking_end" class="form-label">Окончание</label>
+                                <input type="datetime-local" class="form-control" id="booking_end" required>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Отправить заявку</button>
+                        <button type="button" class="btn btn-secondary ms-2" id="cancelBtn">Отмена</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="editFormContainer" class="hidden">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5>Редактирование заявки #<span id="editRequestNumber"></span></h5>
+            <button type="button" class="btn-close" id="closeEditFormBtn"></button>
+        </div>
+        <div class="card-body">
+            <form id="editForm" enctype="multipart/form-data">
+                <input type="hidden" id="edit_request_id">
+
+                <div class="mb-3">
+                <label for="edit_transport_id" class="form-label">Транспорт</label>
+                <select class="form-select select2" id="edit_transport_id" required>
+                    {% set unique_transports = [] %}
+                            {% for transport in transports %}
+                            {% if transport.tsname not in unique_transports|map(attribute='tsname') %}
+                                {% set _ = unique_transports.append(transport) %}
+                                <option value="{{ transport.transport_id }}" data-requires-attachment="{{ transport.requires_attachment }}">
+                                    {{ transport.tsname }}
+                                </option>
+                            {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+                <div class="mb-3">
+                    <label for="edit_phone_number" class="form-label">Телефон</label>
+                    <input type="tel" class="form-control" id="edit_phone_number" placeholder="+7(XXX)XXX-XX-XX" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="edit_purpose" class="form-label">Цель поездки</label>
+                    <textarea class="form-control" id="edit_purpose" rows="3" required></textarea>
+                </div>
+
+                <div class="mb-3" id="edit_attachmentContainer">
+                    <label class="form-label">Прикрепленный файл</label>
+                    <div id="edit_attachment_info" class="mb-2"></div>
+                    <input type="file" class="form-control" id="edit_attachment" name="attachment">
+                    <div class="form-text">Допустимые форматы: PDF, JPG, JPEG, PNG</div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="edit_loc_from" class="form-label">Место подачи</label>
+                        <input type="text" class="form-control" id="edit_loc_from" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="edit_loc_to" class="form-label">Место назначения</label>
+                        <input type="text" class="form-control" id="edit_loc_to" required>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="edit_booking_datetime" class="form-label">Начало</label>
+                        <input type="datetime-local" class="form-control" id="edit_booking_datetime" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="edit_booking_end" class="form-label">Окончание</label>
+                        <input type="datetime-local" class="form-control" id="edit_booking_end" required>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+        <div id="successAlert" class="alert alert-success mt-3 hidden" role="alert"></div>
+        <div id="errorAlert" class="alert alert-danger mt-3 hidden" role="alert"></div>
+
+        <h3>Мои заявки</h3>
+        <div class="requests-feed" id="requestsFeed">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<template id="requestTemplate">
+    <div class="card mb-3 request-card status-{status}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <span>Заявка #{id}</span>
+                <span class="badge bg-{status_color} ms-2">{status_text}</span>
+            </div>
+            <div>
+                {attachment_badge}
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <p><strong>Сотрудник:</strong> {employee}</p>
+                    <p><strong>Подразделение:</strong> {department}</p>
+                    <p><strong>Должность:</strong> {job_title}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Транспорт:</strong> {transport_display}</p>
+                    <p><strong>Телефон:</strong> {phone}</p>
+                    <p><strong>Маршрут:</strong> {from} → {to}</p>
+                </div>
+                <div class="col-md-4">
+                    <p><strong>Время:</strong> {start_time} - {end_time}</p>
+                    <p><strong>Создана:</strong> {request_time}</p>
+                </div>
+            </div>
+            <p><strong>Цель:</strong> {purpose}</p>
+            {comment_html}
+            <div class="action-buttons">
+                {action_buttons}
+            </div>
+        </div>
+    </div>
+</template>
+    <template id="notificationTemplate">
+    <div class="notification-item mb-3 p-3 border-bottom">
+        <div class="d-flex justify-content-between">
+            <div>
+                <p class="mb-1">{message}</p>
+                <small class="text-muted">{created_at}</small>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary mark-as-read-btn" data-id="{id}">
+                <i class="bi bi-check"></i>
+            </button>
+        </div>
+    </div>
+</template>
+    <template id="notificationDropdownItemTemplate">
+    <li>
+        <a class="dropdown-item notification-dropdown-item {unread_class}" href="#">
+            <div class="notification-message">{message}</div>
+            <div class="notification-time">{created_at}</div>
+        </a>
+    </li>
+</template>
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-labelledby="confirmDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmDeleteModalLabel">Подтверждение удаления</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Вы уверены, что хотите удалить эту заявку?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<div class="modal fade" id="attachmentModal" tabindex="-1" aria-labelledby="attachmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content" style="height: 90vh;">
+            <div class="modal-header">
+                <h5 class="modal-title" id="attachmentModalLabel">Просмотр файла</h5>
+                <div class="zoom-controls ms-auto">
+                    <span class="zoom-level mx-2">100%</span>
+                    <button id="resetZoomBtn" class="btn btn-sm btn-outline-secondary ms-2">Сбросить</button>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0 bg-dark" id="imageViewerContainer">
+                <div class="image-wrapper" style="position:relative; width:100%; height:100%; overflow:hidden;">
+                    <img id="attachmentImage" style="position:absolute; max-width:none; transform-origin:0 0; display:none;">
+                    <iframe id="attachmentViewer" style="width:100%; height:100%; border:none; display:none;"></iframe>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <a id="downloadAttachmentBtn" class="btn btn-primary" download>Скачать</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.6/jquery.inputmask.min.js"></script>
+    <script>
+        // Создаем элемент audio для воспроизведения звука уведомления
+        const notificationSound = new Audio('/static/sounds/notification.mp3');
+        let lastNotificationCount = 0; // Переменная для хранения количества уведомлений при последней проверке
+        let lastNotificationIds = []; // Массив для хранения ID последних уведомлений
+
+
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        $(document).ready(function() {
+            // Инициализация маски для телефона
+            $('#phone_number').inputmask('+7(999)999-99-99');
+            $('#edit_phone_number').inputmask('+7(999)999-99-99');
+
+            // Инициализация Select2 для выбора транспорта
+            $('.select2').select2({
+                placeholder: 'Выберите транспорт',
+                width: '100%'
+            });
+
+            // Обработка изменения выбора транспорта
+$('#transport_id, #edit_transport_id').on('change', function() {
+    const selectedOption = $(this).find('option:selected');
+    const requiresAttachment = selectedOption.data('requires-attachment') === 'True';
+    const isKmuTransport = selectedOption.text().includes('Бортовой автомобиль с КМУ');
+    const container = $(this).is('#transport_id') ? $('#attachmentContainer') : $('#edit_attachmentContainer');
+    const checkboxContainer = $(this).is('#transport_id') ? $('#useWithoutInstallationContainer') : $('#edit_useWithoutInstallationContainer');
+
+    if (requiresAttachment) {
+        if (isKmuTransport) {
+            // Для КМУ показываем чекбокс
+            checkboxContainer.show();
+            container.find('input[type="file"]').prop('required', false);
+        } else {
+            // Для другой спецтехники скрываем чекбокс и требуем файл
+            checkboxContainer.hide();
+            container.find('input[type="file"]').prop('required', true);
+        }
+        container.show();
+    } else {
+        checkboxContainer.hide();
+        container.find('input[type="file"]').prop('required', false);
+        container.hide();
+    }
+});
+
+// Обработка изменения чекбокса
+$('#use_without_installation, #edit_use_without_installation').on('change', function() {
+    const isChecked = $(this).is(':checked');
+    const container = $(this).is('#use_without_installation') ? $('#attachmentContainer') : $('#edit_attachmentContainer');
+
+    if (isChecked) {
+        container.find('input[type="file"]').prop('required', false).prop('disabled', true);
+        container.find('.form-text').text('Документ не требуется при использовании без установки');
+    } else {
+        container.find('input[type="file"]').prop('required', true).prop('disabled', false);
+        container.find('.form-text').text('Допустимые форматы: PDF, JPG, JPEG, PNG');
+    }
+});
+
+            // Показать/скрыть форму
+            $('#newBookingBtn').click(function() {
+                $('#bookingFormContainer').removeClass('hidden');
+                $('#editFormContainer').addClass('hidden');
+                $(this).addClass('hidden');
+                $('#attachmentContainer').show();
+            });
+
+            $('#cancelBtn').click(function() {
+                $('#bookingFormContainer').addClass('hidden');
+                $('#newBookingBtn').removeClass('hidden');
+                $('#bookingForm')[0].reset();
+                $('.select2').val(null).trigger('change');
+            });
+
+            // Обработка отправки формы
+            $('#bookingForm').submit(function(e) {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append('surname', $('#surname').val());
+    formData.append('firstname', $('#firstname').val());
+    formData.append('secondname', $('#secondname').val());
+    formData.append('department', $('#department').val());
+    formData.append('job_title', $('#job_title').val());
+    formData.append('transport_id', $('#transport_id').val());
+    formData.append('phone_number', $('#phone_number').val());
+    formData.append('purpose', $('#purpose').val());
+    formData.append('loc_from', $('#loc_from').val());
+    formData.append('loc_to', $('#loc_to').val());
+    formData.append('booking_datetime', $('#booking_datetime').val());
+    formData.append('booking_end', $('#booking_end').val());
+
+    // Добавляем значение чекбокса
+    formData.append('use_without_installation', $('#use_without_installation').is(':checked'));
+
+    const fileInput = $('#attachment')[0];
+    const useWithoutInstallation = $('#use_without_installation').is(':checked');
+
+    // Загружаем файл только если не выбран вариант "без установки"
+    if (!useWithoutInstallation && fileInput.files.length > 0) {
+        formData.append('attachment', fileInput.files[0]);
+    }
+
+                $.ajax({
+                    url: '/api/create_request',
+                    method: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function(response) {
+                        if (response.success) {
+                            $('#successAlert').text(response.message).removeClass('hidden');
+                            $('#errorAlert').addClass('hidden');
+                            $('#bookingForm')[0].reset();
+                            $('.select2').val(null).trigger('change');
+                            $('#bookingFormContainer').addClass('hidden');
+                            $('#newBookingBtn').removeClass('hidden');
+
+                            setTimeout(() => {
+                                $('#successAlert').addClass('hidden');
+                            }, 5000);
+
+                            loadRequests();
+                        } else {
+                            $('#errorAlert').text(response.message).removeClass('hidden');
+                        }
+                    },
+                    error: function(xhr) {
+                        $('#errorAlert').text(xhr.responseJSON?.message || 'Произошла ошибка').removeClass('hidden');
+                    }
+                });
+            });
+
+            // Обработка кнопки редактирования
+            $(document).on('click', '.edit-btn', function(e) {
+                e.preventDefault();
+                const requestId = $(this).data('id');
+                const hasAttachment = $(this).data('has-attachment') === 'true';
+
+                // Загружаем данные заявки с сервера для точного заполнения формы
+                $.get('/api/requests', function(data) {
+                    const request = data.find(r => r.id == requestId);
+                    if (!request) {
+                        $('#errorAlert').text('Заявка не найдена').removeClass('hidden');
+                        return;
+                    }
+
+                    // Заполняем форму
+                    $('#edit_request_id').val(request.id);
+                    $('#editRequestNumber').text(request.id);
+
+                    // Находим транспорт по названию
+                    const transportMatch = request.transport.match(/\(([^)]+)\)$/);
+                    if (transportMatch) {
+                        const tsnumber = transportMatch[1].trim();
+                        $('#edit_transport_id option').each(function() {
+                            if ($(this).text().includes(tsnumber)) {
+                                $('#edit_transport_id').val($(this).val()).trigger('change');
+                                return false;
+                            }
+                        });
+                    }
+
+                    $('#edit_phone_number').val(request.phone);
+                    $('#edit_purpose').val(request.purpose);
+                    $('#edit_loc_from').val(request.from);
+                    $('#edit_loc_to').val(request.to);
+
+                    // Преобразуем даты в формат для input[type=datetime-local]
+                    const startDateParts = request.start_time.split(' ');
+                    const startDate = startDateParts[0].split('.');
+                    const startTime = startDateParts[1];
+                    const formattedStart = `${startDate[2]}-${startDate[1]}-${startDate[0]}T${startTime}`;
+
+                    const endDateParts = request.end_time.split(' ');
+                    const endDate = endDateParts[0].split('.');
+                    const endTime = endDateParts[1];
+                    const formattedEnd = `${endDate[2]}-${endDate[1]}-${endDate[0]}T${endTime}`;
+
+                    $('#edit_booking_datetime').val(formattedStart);
+                    $('#edit_booking_end').val(formattedEnd);
+
+                    // Показываем информацию о файле
+                    if (hasAttachment) {
+                        $('#edit_attachment_info').html(`
+                            <span class="badge bg-success me-2">Файл прикреплен</span>
+                            <button type="button" class="btn btn-sm btn-info view-attachment-btn" data-request-id="${request.id}">
+                                Просмотреть файл
+                            </button>
+                        `);
+                    } else {
+                        $('#edit_attachment_info').html('<span class="badge bg-secondary">Файл отсутствует</span>');
+                    }
+
+                    // Показываем форму редактирования
+                    $('#editFormContainer').removeClass('hidden');
+                    $('#bookingFormContainer').addClass('hidden');
+                    $('#newBookingBtn').removeClass('hidden');
+                });
+            });
+
+            // Обработка кнопки удаления
+            let requestToDelete = null;
+            const confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+
+            $(document).on('click', '.delete-btn', function() {
+                requestToDelete = $(this).data('id');
+                confirmDeleteModal.show();
+            });
+
+            $('#confirmDeleteBtn').click(function() {
+                if (requestToDelete) {
+                    $.ajax({
+                        url: '/api/delete_request/' + requestToDelete,
+                        method: 'POST',
+                        success: function(response) {
+                            if (response.success) {
+                                $('#successAlert').text(response.message).removeClass('hidden');
+                                $('#errorAlert').addClass('hidden');
+                                confirmDeleteModal.hide();
+                                $('#editFormContainer').addClass('hidden');
+                                $('#newBookingBtn').removeClass('hidden');
+
+                                setTimeout(() => {
+                                    $('#successAlert').addClass('hidden');
+                                }, 5000);
+
+                                loadRequests();
+                            } else {
+                                $('#errorAlert').text(response.message).removeClass('hidden');
+                            }
+                        },
+                        error: function(xhr) {
+                            $('#errorAlert').text(xhr.responseJSON?.message || 'Произошла ошибка').removeClass('hidden');
+                        }
+                    });
+                }
+            });
+
+            // Обработка просмотра файла
+            const attachmentModal = new bootstrap.Modal(document.getElementById('attachmentModal'));
+
+            $(document).on('click', '.view-attachment-btn, .attachment-badge', function() {
+                const requestId = $(this).data('request-id') || $(this).closest('.request-card').find('.edit-btn').data('id');
+                const url = `/request/${requestId}/attachment`;
+
+                // Проверяем тип файла
+                $.ajax({
+                    url: url,
+                    type: 'HEAD',
+                    success: function(data, status, xhr) {
+                        const contentType = xhr.getResponseHeader('Content-Type');
+                        if (contentType && contentType.startsWith('image/')) {
+                            isImage = true;
+                            $('#attachmentViewer').hide();
+                            $('#attachmentImage').show().attr('src', url);
+                            resetImageZoom();
+                        } else {
+                            isImage = false;
+                            $('#attachmentImage').hide();
+                            $('#attachmentViewer').show().attr('src', url);
+                        }
+                        attachmentModal.show();
+                    }
+                });
+
+                $('#downloadAttachmentBtn').attr('href', `/request/${requestId}/attachment?download=true`);
+            });
+
+            // Функция для загрузки заявок
+            function loadRequests() {
+                $.get('/api/requests', function(data) {
+                    const template = $('#requestTemplate').html();
+                    const feed = $('#requestsFeed');
+                    feed.empty();
+
+                    if (data.error) {
+                        feed.append('<div class="alert alert-danger">Ошибка загрузки заявок: ' + data.error + '</div>');
+                        return;
+                    }
+
+                    if (data.length === 0) {
+                        feed.append('<div class="alert alert-info">Нет заявок для отображения</div>');
+                        return;
+                    }
+
+                    data.forEach(request => {
+                        let status_color = 'warning';
+                        let status_text = 'На рассмотрении';
+
+                        if (request.is_canceled) {
+                            status_color = 'secondary';
+                            status_text = 'Отменена';
+                        } else if (request.status === 'Approved') {
+                            status_color = 'success';
+                            status_text = 'Одобрена';
+                        } else if (request.status === 'Rejected') {
+                            status_color = 'danger';
+                            status_text = 'Отклонена';
+                        }
+
+                        let comment_html = '';
+                        if (request.comment) {
+                            comment_html = `<div class="comment-box">
+                                <strong>Комментарий диспетчера:</strong>
+                                <p>${request.comment}</p>
+                            </div>`;
+                        }
+
+                        let attachment_badge = '';
+                        if (request.has_attachment) {
+                            attachment_badge = `<span class="badge bg-info attachment-badge me-2"
+                                data-request-id="${request.id}">
+                                Файл прикреплен
+                            </span>`;
+                        }
+
+                        // Определяем, какие кнопки показывать
+                        let action_buttons = '';
+if (!request.is_canceled) {
+    if (request.status === 'Approved' || request.status === 'Pending') {
+        action_buttons = `
+            <button class="btn btn-sm btn-secondary cancel-btn" data-id="${request.id}">
+                Отменить заявку
+            </button>
+        `;
+    }
+
+    if (request.status === 'Pending') {
+        action_buttons += `
+            <button class="btn btn-sm btn-warning edit-btn me-2"
+                data-id="${request.id}"
+                data-has-attachment="${request.has_attachment}">
+                Редактировать
+            </button>
+        `;
+    }
+}
+
+                        // Определяем, что показывать в информации о транспорте
+                        let transport_display = request.transport;
+                        if (request.status !== 'Approved') {
+                            // Если заявка не одобрена, показываем только тип транспорта (до скобки)
+                            const bracketIndex = transport_display.indexOf('(');
+                            if (bracketIndex > -1) {
+                                transport_display = transport_display.substring(0, bracketIndex).trim();
+                            }
+                        }
+
+                        let card = template
+                            .replace(/{id}/g, request.id)
+                            .replace(/{employee}/g, request.employee)
+                            .replace(/{department}/g, request.department)
+                            .replace(/{job_title}/g, request.job_title)
+                            .replace(/{transport_display}/g, transport_display)
+                            .replace(/{purpose}/g, request.purpose)
+                            .replace(/{phone}/g, request.phone)
+                            .replace(/{from}/g, request.from)
+                            .replace(/{to}/g, request.to)
+                            .replace(/{start_time}/g, request.start_time)
+                            .replace(/{end_time}/g, request.end_time)
+                            .replace(/{request_time}/g, request.request_time)
+                            .replace(/{status}/g, request.is_canceled ? 'canceled' : request.status.toLowerCase())
+                            .replace(/{status_color}/g, status_color)
+                            .replace(/{status_text}/g, status_text)
+                            .replace(/{comment_html}/g, comment_html)
+                            .replace(/{attachment_badge}/g, attachment_badge)
+                            .replace(/{action_buttons}/g, action_buttons)
+                            .replace(/{has_attachment}/g, request.has_attachment);
+
+                        feed.append(card);
+                    });
+                }).fail(function(jqXHR, textStatus, errorThrown) {
+                    $('#requestsFeed').html('<div class="alert alert-danger">Ошибка загрузки заявок: ' + textStatus + '</div>');
+                });
+            }
+
+            // Обработка отправки формы редактирования
+            $('#editForm').submit(function(e) {
+                e.preventDefault();
+
+                const requestId = $('#edit_request_id').val();
+                const formData = new FormData();
+
+                formData.append('transport_id', $('#edit_transport_id').val());
+                formData.append('phone_number', $('#edit_phone_number').val());
+                formData.append('purpose', $('#edit_purpose').val());
+                formData.append('loc_from', $('#edit_loc_from').val());
+                formData.append('loc_to', $('#edit_loc_to').val());
+                formData.append('booking_datetime', $('#edit_booking_datetime').val());
+                formData.append('booking_end', $('#edit_booking_end').val());
+
+                const fileInput = $('#edit_attachment')[0];
+                if (fileInput.files.length > 0) {
+                    formData.append('attachment', fileInput.files[0]);
+                }
+
+                $.ajax({
+                    url: '/api/update_request/' + requestId,
+                    method: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function(response) {
+                        if (response.success) {
+                            $('#successAlert').text(response.message).removeClass('hidden');
+                            $('#errorAlert').addClass('hidden');
+                            $('#editFormContainer').addClass('hidden');
+                            $('#newBookingBtn').removeClass('hidden');
+
+                            setTimeout(() => {
+                                $('#successAlert').addClass('hidden');
+                            }, 5000);
+
+                            loadRequests();
+                        } else {
+                            $('#errorAlert').text(response.message).removeClass('hidden');
+                        }
+                    },
+                    error: function(xhr) {
+                        $('#errorAlert').text(xhr.responseJSON?.message || 'Произошла ошибка').removeClass('hidden');
+                    }
+                });
+            });
+
+            // Обработка кнопки отмены заявки
+            $(document).on('click', '.cancel-btn', function() {
+                const requestId = $(this).data('id');
+
+                if (confirm('Вы уверены, что хотите отменить эту заявку?')) {
+                    $.ajax({
+                        url: '/api/cancel_request/' + requestId,
+                        method: 'POST',
+                        success: function(response) {
+                            if (response.success) {
+                                $('#successAlert').text(response.message).removeClass('hidden');
+                                $('#errorAlert').addClass('hidden');
+                                loadRequests();
+                            } else {
+                                $('#errorAlert').text(response.message).removeClass('hidden');
+                            }
+                        },
+                        error: function(xhr) {
+                            $('#errorAlert').text(xhr.responseJSON?.message || 'Произошла ошибка').removeClass('hidden');
+                        }
+                    });
+                }
+            });
+
+            // Закрытие формы редактирования
+            $('#closeEditFormBtn').click(function(e) {
+                e.preventDefault();
+                $('#editFormContainer').addClass('hidden');
+                $('#newBookingBtn').removeClass('hidden');
+            });
+
+            // Установка минимальной даты для полей ввода
+            function setMinDateTime() {
+                const now = new Date();
+                // Добавляем 5 минут к текущему времени
+                now.setMinutes(now.getMinutes() + 5);
+
+                // Форматируем дату для input[type=datetime-local]
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+
+                const minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+                $('#booking_datetime').attr('min', minDateTime);
+                $('#booking_end').attr('min', minDateTime);
+                $('#edit_booking_datetime').attr('min', minDateTime);
+                $('#edit_booking_end').attr('min', minDateTime);
+            }
+
+            // Вызываем при загрузке страницы
+            setMinDateTime();
+
+            // Обновляем минимальное время кажд
+            setInterval(setMinDateTime, 60000);
+
+            // Загружаем заявки при загрузке страницы
+            loadRequests();
+
+            // Обновляем заявки каждые 5 секунд
+            setInterval(loadRequests, 5000);
+
+            // Масштабирование и управление просмотром файла
+            let currentScale = 1;
+            const minScale = 0.5;
+            const maxScale = 3;
+            const scaleStep = 0.1;
+
+            function updateZoom() {
+                $('#attachmentViewer').css('transform', `scale(${currentScale})`);
+                $('.zoom-level').text(`${Math.round(currentScale * 100)}%`);
+            }
+
+            // Обработчики масштабирования
+            $('.zoom-in').click(function() {
+                if (currentScale < maxScale) {
+                    currentScale += scaleStep;
+                    updateZoom();
+                }
+            });
+
+            $('.zoom-out').click(function() {
+                if (currentScale > minScale) {
+                    currentScale -= scaleStep;
+                    updateZoom();
+                }
+            });
+
+            $('#resetZoomBtn').click(function() {
+                currentScale = 1;
+                updateZoom();
+            });
+
+            // Полноэкранный режим
+            $('.fullscreen').click(function() {
+                const $modal = $('#attachmentModal');
+                const $modalDialog = $modal.find('.modal-dialog');
+
+                if ($modalDialog.hasClass('modal-fullscreen')) {
+                    $modalDialog.removeClass('modal-fullscreen');
+                    $modalDialog.addClass('modal-xl');
+                } else {
+                    $modalDialog.removeClass('modal-xl');
+                    $modalDialog.addClass('modal-fullscreen');
+                }
+            });
+
+            // Переменные для управления масштабированием и перемещением
+            let scale = 1;
+            let posX = 0;
+            let posY = 0;
+            let isDragging = false;
+            let startX, startY;
+            let isImage = false;
+
+            // Сброс масштаба и позиции
+            function resetImageZoom() {
+                if (!isImage) return;
+
+                const container = $('#imageViewerContainer');
+                const img = $('#attachmentImage');
+
+                // Получаем размеры
+                const containerWidth = container.width();
+                const containerHeight = container.height();
+                const imgWidth = img[0].naturalWidth;
+                const imgHeight = img[0].naturalHeight;
+
+                // Вычисляем масштаб для вписывания
+                const scaleX = containerWidth / imgWidth;
+                const scaleY = containerHeight / imgHeight;
+                scale = Math.min(scaleX, scaleY);
+
+                // Центрируем изображение
+                posX = (containerWidth - imgWidth * scale) / 2;
+                posY = (containerHeight - imgHeight * scale) / 2;
+
+                applyTransform();
+                updateZoomLevel();
+            }
+
+            // Применение трансформации
+            function applyTransform() {
+                $('#attachmentImage').css({
+                    'transform': `translate(${posX}px, ${posY}px) scale(${scale})`,
+                    'left': '0',
+                    'top': '0'
+                });
+            }
+
+            // Обновление отображения масштаба
+            function updateZoomLevel() {
+                $('.zoom-level').text(`${Math.round(scale * 100)}%`);
+            }
+
+            // Обработка колесика мыши
+            $('#imageViewerContainer').on('wheel', function(e) {
+                if (!isImage) return;
+                e.preventDefault();
+
+                const delta = e.originalEvent.deltaY > 0 ? -0.1 : 0.1;
+                const oldScale = scale;
+
+                // Масштабируем с ограничениями
+                scale = Math.max(0.1, Math.min(scale + delta, 5));
+
+                // Корректируем позицию для масштабирования к курсору
+                const mouseX = e.originalEvent.clientX - $(this).offset().left;
+                const mouseY = e.originalEvent.clientY - $(this).offset().top;
+
+                posX = mouseX - (mouseX - posX) * (scale / oldScale);
+                posY = mouseY - (mouseY - posY) * (scale / oldScale);
+
+                applyTransform();
+                updateZoomLevel();
+            });
+
+            // Перетаскивание изображения
+            $('#attachmentImage').on('mousedown', function(e) {
+                if (!isImage) return;
+                isDragging = true;
+                startX = e.clientX - posX;
+                startY = e.clientY - posY;
+                $(this).css('cursor', 'grabbing');
+            });
+
+            $(document).on('mousemove', function(e) {
+                if (!isDragging || !isImage) return;
+                posX = e.clientX - startX;
+                posY = e.clientY - startY;
+                applyTransform();
+            });
+
+            $(document).on('mouseup', function() {
+                if (!isImage) return;
+                isDragging = false;
+                $('#attachmentImage').css('cursor', 'grab');
+            });
+
+            // При открытии модального окна
+            $('#attachmentModal').on('shown.bs.modal', function() {
+                if (isImage) {
+                    $('#attachmentImage').css('cursor', 'grab');
+                    resetImageZoom();
+                }
+            });
+
+            // При закрытии модального окна
+            $('#attachmentModal').on('hidden.bs.modal', function() {
+                isDragging = false;
+            });
+
+            // Обработка кнопки "Пометить все как прочитанные"
+            $('#markAllAsRead').click(function(e) {
+                e.preventDefault();
+                $.post('/api/notifications/mark_all_as_read', function() {
+                    // Обновляем бейдж и список уведомлений
+                    $('#notificationBadge').addClass('hidden');
+                    $('.notification-dropdown-item').removeClass('notification-unread');
+                });
+            });
+
+            // Функция для обновления выпадающего списка уведомлений
+            function updateNotificationsDropdown() {
+                $.get('/api/notifications', function(data) {
+                    const dropdownMenu = $('#notificationsDropdownMenu');
+                    const template = $('#notificationDropdownItemTemplate').html();
+
+                    // Проверяем, изменились ли уведомления
+                    const currentIds = data.notifications.map(n => n.id);
+                    const hasNewNotifications = JSON.stringify(currentIds) !== JSON.stringify(lastNotificationIds);
+
+                    if (hasNewNotifications) {
+                        // Обновляем список уведомлений
+                        dropdownMenu.find('li:not(:first-child):not(:last-child):not(:nth-last-child(2))').remove();
+
+                        data.notifications.forEach(notification => {
+                            const item = template
+                                .replace('{message}', notification.message)
+                                .replace('{created_at}', notification.created_at)
+                                .replace('{id}', notification.id)
+                                .replace('{unread_class}', notification.is_read ? '' : 'notification-unread');
+
+                            dropdownMenu.find('li:first-child').after(item);
+                        });
+
+                        // Обновляем счетчик уведомлений
+                        const unreadCount = data.notifications.filter(n => !n.is_read).length;
+                        if (unreadCount > 0) {
+                            $('#notificationBadge').text(unreadCount).removeClass('hidden');
+                        } else {
+                            $('#notificationBadge').addClass('hidden');
+                        }
+
+                        // Обновляем массив последних ID уведомлений
+                        lastNotificationIds = currentIds;
+                    }
+                });
+            }
+
+            // Функция для проверки новых уведомлений
+            function checkNewNotifications() {
+                $.get('/api/notifications_count', function(data) {
+                    const currentCount = data.count;
+
+                    // Воспроизводим звук только если количество уведомлений увеличилось
+                    if (currentCount > lastNotificationCount) {
+                        notificationSound.play().catch(e => console.log("Не удалось воспроизвести звук уведомления:", e));
+                    }
+
+                    // Обновляем бейдж
+                    if (currentCount > 0) {
+                        $('#notificationBadge').text(currentCount).removeClass('hidden');
+                    } else {
+                        $('#notificationBadge').addClass('hidden');
+                    }
+
+                    // Обновляем счетчик
+                    lastNotificationCount = currentCount;
+                });
+            }
+
+            // Проверяем новые уведомления при загрузке страницы
+            checkNewNotifications();
+            updateNotificationsDropdown();
+
+            // Проверяем новые уведомления каждую секунду
+            setInterval(checkNewNotifications, 1000);
+
+            // Обновляем выпадающий список уведомлений каждую секунду
+            setInterval(updateNotificationsDropdown, 1000);
+        });
+         function setCurrentDateTime() {
+        const now = new Date();
+
+        // Форматируем дату для input[type=datetime-local]
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+
+        const currentDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+        // Устанавливаем текущее время в поле "Начало"
+        $('#booking_datetime').val(currentDateTime);
+
+        // Устанавливаем время окончания (текущее время + 1 час)
+        const endTime = new Date();
+        const endHours = String(endTime.getHours()).padStart(2, '0');
+        const endMinutes = String(endTime.getMinutes()).padStart(2, '0');
+        const endDateTime = `${year}-${month}-${day}T${endHours}:${endMinutes}`;
+
+        // Устанавливаем время окончания
+        $('#booking_end').val(currentDateTime);
+    }
+
+    // Вызываем функцию при открытии формы
+    $('#newBookingBtn').click(function() {
+        $('#bookingFormContainer').removeClass('hidden');
+        $('#editFormContainer').addClass('hidden');
+        $(this).addClass('hidden');
+        $('#attachmentContainer').show();
+
+        // Устанавливаем текущее время
+        setCurrentDateTime();
+    });
+    </script>
+</body>
+</html>

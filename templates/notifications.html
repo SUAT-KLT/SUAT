@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Все уведомления</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .notification-item {
+            transition: all 0.3s ease;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #dee2e6;
+            position: relative;
+        }
+        .notification-item:hover {
+            background-color: #f8f9fa;
+        }
+        .mark-as-read-btn {
+            opacity: 0.5;
+            transition: opacity 0.3s;
+            border: none;
+            background: none;
+            padding: 0;
+            cursor: pointer;
+        }
+        .mark-as-read-btn:hover {
+            opacity: 1;
+            color: #0d6efd;
+        }
+        #notificationsContainer {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .unread-marker {
+            position: absolute;
+            left: 5px;
+            top: 5px;
+            width: 8px;
+            height: 8px;
+            background-color: #0d6efd;
+            border-radius: 50%;
+        }
+        .unread-notification {
+            background-color: #f8fbff;
+            border-left: 3px solid #0d6efd;
+        }
+        .read-notification {
+            opacity: 0.8;
+        }
+        .notification-time {
+            color: #6c757d;
+            font-size: 0.85rem;
+        }
+        .notification-content {
+            margin-left: 15px;
+            flex-grow: 1;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                СУАТ ООО "КУЛТУМИНСКОЕ"
+            </a>
+            <div class="d-flex align-items-center">
+                <a href="{{ url_for('index') }}" class="btn btn-outline-light me-2">На главную</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Все уведомления</h1>
+            <button class="btn btn-primary" id="markAllAsRead">
+                <i class="bi bi-check-all"></i> Пометить все как прочитанные
+            </button>
+        </div>
+
+        <div id="notificationsContainer">
+            <div class="text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <template id="notificationTemplate">
+        <div class="notification-item {unread_class}" data-id="{id}">
+            {unread_marker}
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="notification-content">
+                    <p class="mb-1">{message}</p>
+                    <small class="notification-time">{created_at}</small>
+                </div>
+                {mark_as_read_button}
+            </div>
+        </div>
+    </template>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Функция для загрузки всех уведомлений (и прочитанных, и непрочитанных)
+            function loadAllNotifications() {
+                $.get('/api/all_notifications', function(data) {
+                    const container = $('#notificationsContainer');
+                    container.find('.spinner-border').remove();
+
+                    if (data.error) {
+                        container.html('<div class="alert alert-danger">Ошибка загрузки уведомлений</div>');
+                        return;
+                    }
+
+                    if (data.length === 0) {
+                        container.html('<div class="alert alert-info">Нет уведомлений</div>');
+                        return;
+                    }
+
+                    const template = $('#notificationTemplate').html();
+                    container.empty();
+
+                    data.forEach(notification => {
+                        const unreadClass = notification.is_read ? 'read-notification' : 'unread-notification';
+                        const unreadMarker = notification.is_read ? '' : '<div class="unread-marker"></div>';
+                        const markAsReadButton = notification.is_read ? '' :
+                            `<button class="mark-as-read-btn" data-id="${notification.id}" title="Пометить как прочитанное">
+                                <i class="bi bi-check-lg"></i>
+                            </button>`;
+
+                        let item = template
+                            .replace(/{id}/g, notification.id)
+                            .replace(/{message}/g, notification.message)
+                            .replace(/{created_at}/g, notification.created_at)
+                            .replace(/{unread_class}/g, unreadClass)
+                            .replace(/{unread_marker}/g, unreadMarker)
+                            .replace(/{mark_as_read_button}/g, markAsReadButton);
+
+                        container.append(item);
+                    });
+                }).fail(function() {
+                    $('#notificationsContainer').html('<div class="alert alert-danger">Ошибка загрузки уведомлений</div>');
+                });
+            }
+
+            // Пометить уведомление как прочитанное
+            $(document).on('click', '.mark-as-read-btn', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const notificationId = $(this).data('id');
+                const $notificationItem = $(this).closest('.notification-item');
+                const $button = $(this);
+
+                $.ajax({
+                    url: '/api/notifications/mark_as_read',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({id: notificationId}),
+                    success: function(response) {
+                        if (response.success) {
+                            // Визуально помечаем как прочитанное
+                            $notificationItem
+                                .removeClass('unread-notification')
+                                .addClass('read-notification')
+                                .find('.unread-marker').remove();
+
+                            // Удаляем кнопку "Пометить как прочитанное"
+                            $button.remove();
+
+                            // Показываем временное подтверждение
+                            const $checkIcon = $('<i class="bi bi-check-lg text-success"></i>');
+                            $notificationItem.find('.notification-content').append($checkIcon);
+                            setTimeout(() => $checkIcon.fadeOut(500, () => $checkIcon.remove()), 1000);
+                        }
+                    },
+                    error: function() {
+                        alert('Ошибка при обновлении уведомления');
+                    }
+                });
+            });
+
+            // Пометить все как прочитанные
+            $('#markAllAsRead').click(function(e) {
+                e.preventDefault();
+
+                $.ajax({
+                    url: '/api/notifications/mark_all_as_read',
+                    method: 'POST',
+                    success: function(response) {
+                        if (response.success) {
+                            // Визуально помечаем все как прочитанные
+                            $('.notification-item').each(function() {
+                                $(this)
+                                    .removeClass('unread-notification')
+                                    .addClass('read-notification')
+                                    .find('.unread-marker').remove();
+
+                                // Удаляем кнопки "Пометить как прочитанное"
+                                $(this).find('.mark-as-read-btn').remove();
+                            });
+
+                            // Показываем временное подтверждение
+                            const $checkAll = $('<div class="text-center text-success mb-3"><i class="bi bi-check-all"></i> Все уведомления помечены как прочитанные</div>');
+                            $('#notificationsContainer').prepend($checkAll);
+                            setTimeout(() => $checkAll.fadeOut(500, () => $checkAll.remove()), 2000);
+                        }
+                    },
+                    error: function() {
+                        alert('Ошибка при обновлении уведомлений');
+                    }
+                });
+            });
+
+            // Загружаем все уведомления при загрузке страницы
+            loadAllNotifications();
+        });
+    </script>
+</body>
+</html>

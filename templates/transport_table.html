@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Таблица забронированного транспорта</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .table-container {
+            margin-top: 20px;
+        }
+        .status-approved {
+            background-color: #d4edda;
+        }
+        .status-pending {
+            background-color: #fff3cd;
+        }
+    </style>
+</head>
+<body>
+    {% include 'navbar.html' %}
+
+    <div class="container">
+        <h1 class="my-4">Таблица забронированного транспорта</h1>
+        
+        <div class="table-container">
+            <table class="table table-bordered table-hover" id="transportTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Транспорт</th>
+                        <th>Марка</th>
+                        <th>Модель</th>
+                        <th>Гос. номер</th>
+                        <th>Сотрудник</th>
+                        <th>Отдел</th>
+                        <th>Начало брони</th>
+                        <th>Конец брони</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody id="bookingsBody">
+                    {% for booking in bookings %}
+                    <tr class="status-{{ booking.status }}">
+                        <td>{{ booking.transport.tsname }}</td>
+                        <td>{{ booking.transport.brand }}</td>
+                        <td>{{ booking.transport.model }}</td>
+                        <td>{{ booking.transport.tsnumber }}</td>
+                        <td>{{ booking.employee.surname }} {{ booking.employee.firstname }}</td>
+                        <td>{{ booking.employee.department }}</td>
+                        <td>{{ booking.request.booking_datetime.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>{{ booking.request.booking_end.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            {% if booking.approval.approval_status == 'Approved' %}
+                                <span class="badge bg-success">Одобрено</span>
+                            {% elif booking.approval.approval_status == 'Pending' %}
+                                <span class="badge bg-warning">На рассмотрении</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

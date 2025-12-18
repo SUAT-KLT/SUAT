@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Отчет по заявкам - Диспетчер</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .status-badge {
+            min-width: 100px;
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        .sort-icon {
+            cursor: pointer;
+        }
+        .sort-icon:hover {
+            color: #0d6efd;
+        }
+        .sort-active {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .interval-col {
+            min-width: 200px;
+        }
+        .transport-time {
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .transport-summary {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .calculate-btn {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Навигационная панель -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">СУАТ ООО "КУЛТУМИНСКОЕ"</a>
+            <div class="d-flex">
+                {% if logged_in %}
+                    {% if is_admin %}
+                        <a href="{{ url_for('manage_users') }}" class="btn btn-outline-light me-2">Управление пользователями</a>
+                    {% endif %}
+                    <span class="navbar-text me-3">Вы вошли как: {{ session['user_login'] }}</span>
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Выйти</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-light">Войти</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Отчет по заявкам</h1>
+            <div>
+                <a href="{{ url_for('dispatcher_requests') }}" class="btn btn-outline-secondary me-2">
+                    <i class="bi bi-arrow-left"></i> Назад к заявкам
+                </a>
+            </div>
+        </div>
+
+        <!-- Форма параметров отчета -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Параметры отчета</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="row g-3" id="reportForm">
+                    <div class="col-md-5">
+                        <label for="start_date" class="form-label">Дата начала</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}" required>
+                    </div>
+                    <div class="col-md-5">
+                        <label for="end_date" class="form-label">Дата окончания</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}" required>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Сформировать</button>
+                            {% if requests %}
+                                <button type="button" id="exportExcelBtn" class="btn btn-success">
+                                    <i class="bi bi-file-excel"></i> Excel
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if requests %}
+        <!-- Фильтры и расчет времени -->
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-4">
+                    <label for="transportFilter" class="form-label">Фильтр по транспорту:</label>
+                    <select id="transportFilter" class="form-select">
+                        <option value="">Все транспорты</option>
+                        {% for transport in requests|map(attribute='transport')|unique %}
+                            <option value="{{ transport }}">{{ transport }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="departmentFilter" class="form-label">Фильтр по подразделению:</label>
+                    <select id="departmentFilter" class="form-select">
+                        <option value="">Все подразделения</option>
+                        {% for department in requests|map(attribute='department')|unique %}
+                            <option value="{{ department }}">{{ department }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="statusFilter" class="form-label">Фильтр по статусу:</label>
+                    <select id="statusFilter" class="form-select">
+                        <option value="">Все статусы</option>
+                        <option value="Одобрено">Одобрено</option>
+                        <option value="На рассмотрении">На рассмотрении</option>
+                        <option value="Отклонено">Отклонено</option>
+                        <option value="Отменено">Отменено</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <label for="transportSelect" class="form-label">Выберите транспорт для расчета времени:</label>
+                    <select id="transportSelect" class="form-select">
+                        <option value="">-- Выберите транспорт --</option>
+                        {% for transport in requests|map(attribute='transport')|unique %}
+                            <option value="{{ transport }}">{{ transport }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" id="calculateTimeBtn" class="btn btn-primary calculate-btn">
+                        Рассчитать общее время
+                    </button>
+                </div>
+                <div class="col-md-8 d-flex align-items-end">
+                    <div id="timeResult" class="alert alert-info mb-0 w-100" style="display: none;">
+                        <strong>Результат:</strong> <span id="totalTime"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Таблица заявок -->
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Список заявок</h5>
+                    <div>
+                        <span class="badge bg-primary me-1">Всего: {{ total }}</span>
+                        <span class="badge bg-success me-1">Одобрено: {{ approved }}</span>
+                        <span class="badge bg-warning me-1">На рассмотрении: {{ pending }}</span>
+                        <span class="badge bg-danger me-1">Отклонено: {{ rejected }}</span>
+                        <span class="badge bg-secondary">Отменено: {{ canceled }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" id="requestsTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID <i class="bi bi-arrow-down-up sort-icon" data-sort="id"></i></th>
+                                <th>Сотрудник <i class="bi bi-arrow-down-up sort-icon" data-sort="employee"></i></th>
+                                <th>Подразделение <i class="bi bi-arrow-down-up sort-icon" data-sort="department"></i></th>
+                                <th>Транспорт <i class="bi bi-arrow-down-up sort-icon" data-sort="transport"></i></th>
+                                <th class="interval-col">Интервал бронирования</th>
+                                <th>Продолжительность</th>
+                                <th>Статус <i class="bi bi-arrow-down-up sort-icon" data-sort="status"></i></th>
+                                <th>Дата создания <i class="bi bi-arrow-down-up sort-icon" data-sort="created"></i></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for req in requests %}
+                        <tr class="request-row"
+                            data-id="{{ req.id }}"
+                            data-transport="{{ req.transport }}"
+                            data-department="{{ req.department }}"
+                            data-status="{% if req.status == 'Canceled' %}Отменено{% elif req.status == 'Approved' %}Одобрено{% elif req.status == 'Rejected' %}Отклонено{% else %}На рассмотрении{% endif %}"
+                            data-start-time="{{ req.start_time }}"
+                            data-end-time="{{ req.end_time }}"
+                            data-duration-seconds="{{ req.duration_seconds }}"
+                            data-created="{{ req.request_time }}">
+                            <td>{{ req.id }}</td>
+                            <td>{{ req.employee }}</td>
+                            <td>{{ req.department }}</td>
+                            <td>{{ req.transport }}</td>
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold">{{ req.start_time }}</span>
+                                    <span class="text-muted small">до</span>
+                                    <span class="fw-bold">{{ req.end_time }}</span>
+                                </div>
+                            </td>
+                            <td class="transport-time">
+                                {% set duration = req.duration_seconds %}
+                                {% set days = (duration / (24 * 3600))|int %}
+                                {% set duration = duration % (24 * 3600) %}
+                                {% set hours = (duration / 3600)|int %}
+                                {% set duration = duration % 3600 %}
+                                {% set minutes = (duration / 60)|int %}
+                                {% if days > 0 %}{{ days }}д {% endif %}{{ hours }}ч {{ minutes }}м
+                            </td>
+                            <td>
+                                {% if req.status == 'Canceled' %}
+                                    <span class="badge bg-secondary status-badge">Отменено</span>
+                                {% elif req.status == 'Approved' %}
+                                    <span class="badge bg-success status-badge">Одобрено</span>
+                                {% elif req.status == 'Rejected' %}
+                                    <span class="badge bg-danger status-badge">Отклонено</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark status-badge">На рассмотрении</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ req.request_time }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Функция для форматирования времени из секунд в читаемый формат
+            function formatDuration(seconds) {
+                const days = Math.floor(seconds / (3600 * 24));
+                seconds %= 3600 * 24;
+                const hours = Math.floor(seconds / 3600);
+                seconds %= 3600;
+                const minutes = Math.floor(seconds / 60);
+
+                let result = '';
+                if (days > 0) result += `${days}д `;
+                if (hours > 0) result += `${hours}ч `;
+                if (minutes > 0 || result === '') result += `${minutes}м`;
+
+                return result.trim();
+            }
+
+            // Функция для подсчета общего времени использования транспорта
+            function calculateTransportUsage() {
+                const transportSelect = document.getElementById('transportSelect');
+                const selectedTransport = transportSelect.value;
+
+                if (!selectedTransport) {
+                    alert('Пожалуйста, выберите транспорт для расчета');
+                    return;
+                }
+
+                const rows = document.querySelectorAll('.request-row');
+                let totalSeconds = 0;
+                let approvedCount = 0;
+
+                rows.forEach(row => {
+                    const transport = row.getAttribute('data-transport');
+                    const status = row.getAttribute('data-status');
+                    const durationSeconds = parseInt(row.getAttribute('data-duration-seconds')) || 0;
+
+                    if (transport === selectedTransport && status === 'Одобрено') {
+                        totalSeconds += durationSeconds;
+                        approvedCount++;
+                    }
+                });
+
+                const timeResult = document.getElementById('timeResult');
+                const totalTimeElement = document.getElementById('totalTime');
+
+                if (approvedCount > 0) {
+                    totalTimeElement.innerHTML = `
+                        Транспорт <strong>${selectedTransport}</strong> был занят в течение
+                        <strong>${formatDuration(totalSeconds)}</strong> (${approvedCount} одобренных заявок)
+                    `;
+                    timeResult.style.display = 'block';
+                } else {
+                    totalTimeElement.innerHTML = `
+                        Для транспорта <strong>${selectedTransport}</strong> нет одобренных заявок в выбранном периоде
+                    `;
+                    timeResult.style.display = 'block';
+                }
+            }
+
+            // Текущее состояние сортировки
+            let currentSort = {
+                column: null,
+                direction: 'asc'
+            };
+
+            // Применение фильтров
+            const applyFilters = () => {
+                const transportValue = document.getElementById('transportFilter').value;
+                const departmentValue = document.getElementById('departmentFilter').value;
+                const statusValue = document.getElementById('statusFilter').value;
+                const rows = document.querySelectorAll('.request-row');
+
+                rows.forEach(row => {
+                    const rowTransport = row.getAttribute('data-transport');
+                    const rowDepartment = row.getAttribute('data-department');
+                    const rowStatus = row.getAttribute('data-status');
+
+                    const transportMatch = !transportValue || rowTransport === transportValue;
+                    const departmentMatch = !departmentValue || rowDepartment === departmentValue;
+                    const statusMatch = !statusValue || rowStatus === statusValue;
+
+                    row.style.display = (transportMatch && departmentMatch && statusMatch) ? '' : 'none';
+                });
+            };
+
+            // Инициализация фильтров
+            document.getElementById('transportFilter').addEventListener('change', applyFilters);
+            document.getElementById('departmentFilter').addEventListener('change', applyFilters);
+            document.getElementById('statusFilter').addEventListener('change', applyFilters);
+
+            // Обработчик кнопки расчета времени
+            document.getElementById('calculateTimeBtn').addEventListener('click', calculateTransportUsage);
+
+            // Функция сортировки
+            const sortTable = (column, direction) => {
+                const table = document.getElementById('requestsTable');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr:not([style*="display: none"])'));
+
+                rows.sort((a, b) => {
+                    let aValue, bValue;
+
+                    switch(column) {
+                        case 'id':
+                            aValue = parseInt(a.getAttribute('data-id'));
+                            bValue = parseInt(b.getAttribute('data-id'));
+                            break;
+                        case 'employee':
+                            aValue = a.cells[1].textContent.toLowerCase();
+                            bValue = b.cells[1].textContent.toLowerCase();
+                            break;
+                        case 'department':
+                            aValue = a.cells[2].textContent.toLowerCase();
+                            bValue = b.cells[2].textContent.toLowerCase();
+                            break;
+                        case 'transport':
+                            aValue = a.cells[3].textContent.toLowerCase();
+                            bValue = b.cells[3].textContent.toLowerCase();
+                            break;
+                        case 'status':
+                            aValue = a.getAttribute('data-status').toLowerCase();
+                            bValue = b.getAttribute('data-status').toLowerCase();
+                            break;
+                        case 'created':
+                            aValue = new Date(a.getAttribute('data-created').split('.').reverse().join('-'));
+                            bValue = new Date(b.getAttribute('data-created').split('.').reverse().join('-'));
+                            break;
+                        default:
+                            return 0;
+                    }
+
+                    if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+                    if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+
+                // Обновление таблицы
+                while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+                rows.forEach(row => tbody.appendChild(row));
+            };
+
+            // Обработчики сортировки
+            document.querySelectorAll('.sort-icon').forEach(icon => {
+                icon.addEventListener('click', function() {
+                    const column = this.getAttribute('data-sort');
+                    let direction = 'asc';
+
+                    if (currentSort.column === column) {
+                        direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                    }
+
+                    // Обновление иконок
+                    document.querySelectorAll('.sort-icon').forEach(i => {
+                        i.classList.remove('sort-active', 'bi-arrow-up', 'bi-arrow-down');
+                        i.classList.add('bi-arrow-down-up');
+                    });
+
+                    this.classList.remove('bi-arrow-down-up');
+                    this.classList.add('sort-active', direction === 'asc' ? 'bi-arrow-up' : 'bi-arrow-down');
+
+                    // Сохранение состояния и сортировка
+                    currentSort = { column, direction };
+                    sortTable(column, direction);
+                });
+            });
+
+            // Экспорт в Excel с общей статистикой
+            document.getElementById('exportExcelBtn')?.addEventListener('click', function() {
+                const table = document.getElementById('requestsTable');
+                const visibleRows = Array.from(table.querySelectorAll('tbody tr:not([style*="display: none"])'));
+
+                // Подготовка данных
+                const data = [
+                    ['ID', 'Сотрудник', 'Подразделение', 'Транспорт', 'Начало брони', 'Окончание брони', 'Статус', 'Дата создания']
+                ];
+
+                // Собираем статистику по транспорту
+                const transportStats = {};
+                visibleRows.forEach(row => {
+                    const transport = row.getAttribute('data-transport');
+                    const status = row.getAttribute('data-status');
+                    const durationSeconds = parseInt(row.getAttribute('data-duration-seconds')) || 0;
+
+                    if (!transportStats[transport]) {
+                        transportStats[transport] = {
+                            totalSeconds: 0,
+                            count: 0
+                        };
+                    }
+
+                    if (status === 'Одобрено') {
+                        transportStats[transport].totalSeconds += durationSeconds;
+                        transportStats[transport].count++;
+                    }
+                });
+
+                // Добавляем строки с данными
+                visibleRows.forEach(row => {
+                    data.push([
+                        row.getAttribute('data-id'),
+                        row.cells[1].textContent,
+                        row.getAttribute('data-department'),
+                        row.getAttribute('data-transport'),
+                        row.getAttribute('data-start-time'),
+                        row.getAttribute('data-end-time'),
+                        row.getAttribute('data-status'),
+                        row.getAttribute('data-created')
+                    ]);
+                });
+
+
+                data.push([]);
+
+                // Добавляем заголовок статистики
+                data.push(['Статистика использования транспорта']);
+                data.push(['Транспорт', 'Общее время использования', 'Количество одобренных заявок']);
+
+                // Добавляем данные статистики
+                Object.entries(transportStats).forEach(([transport, stats]) => {
+                    if (stats.count > 0) {
+                        data.push([
+                            transport,
+                            formatDuration(stats.totalSeconds),
+                            stats.count
+                        ]);
+                    }
+                });
+
+                // Создание книги Excel
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(data);
+
+                // Настройка ширины столбцов
+                ws['!cols'] = [
+                    { width: 10 }, { width: 25 }, { width: 25 }, { width: 25 },
+                    { width: 20 }, { width: 20 }, { width: 20 }, { width: 15 }, { width: 20 }
+                ];
+
+                XLSX.utils.book_append_sheet(wb, ws, "Отчет");
+
+                // Генерация файла
+                const startDate = document.getElementById('start_date').value;
+                const endDate = document.getElementById('end_date').value;
+                XLSX.writeFile(wb, `Отчет_${start_date}_${end_date}.xlsx`);
+            });
+        });
+    </script>
+</body>
+</html>

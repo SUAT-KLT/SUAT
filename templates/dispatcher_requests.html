@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заявки на транспорт - Диспетчер</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .status-badge {
+            min-width: 100px;
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        .comment-cell {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">СУАТ ООО "КУЛТУМИНСКОЕ"</a>
+            <div class="d-flex">
+                {% if logged_in %}
+                    {% if is_admin %}
+                        <a href="{{ url_for('manage_users') }}" class="btn btn-outline-light me-2">Управление пользователями</a>
+                    {% endif %}
+                    <span class="navbar-text me-3">Вы вошли как: {{ session['user_login'] }}</span>
+                    <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Выйти</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-light">Войти</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>Заявки на транспорт</h1>
+            <div>
+                <a href="{{ url_for('dispatcher_reports') }}" class="btn btn-success me-2">
+                    <i class="bi bi-file-earmark-text"></i> Сформировать отчет
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-house"></i> На главную
+                </a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card mb-4">
+<div class="card-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Список заявок</h5>
+        <div>
+            <span class="badge bg-primary me-1">Всего: {{ total }}</span>
+            <span class="badge bg-success me-1">Одобрено: {{ approved }}</span>
+            <span class="badge bg-warning me-1">На рассмотрении: {{ pending }}</span>
+            <span class="badge bg-danger me-1">Отклонено: {{ rejected }}</span>
+            <span class="badge bg-secondary">Отменено: {{ canceled }}</span>
+        </div>
+    </div>
+</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Сотрудник</th>
+                                <th>Транспорт</th>
+                                <th>Время брони</th>
+                                <th>Статус</th>
+                                <th>Комментарий</th>
+                                <th>Дата создания</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr>
+                                <td>{{ req.id }}</td>
+                                <td>{{ req.employee }}</td>
+                                <td>{{ req.transport }}</td>
+                                <td>
+                                    {{ req.start_time }}<br>
+                                    {{ req.end_time }}
+                                </td>
+                                <td>
+                                    {% if req.is_canceled %}
+                                        <span class="badge bg-secondary status-badge">Отменено</span>
+                                    {% elif req.status == 'Approved' %}
+                                        <span class="badge bg-success status-badge">Одобрено</span>
+                                    {% elif req.status == 'Rejected' %}
+                                        <span class="badge bg-danger status-badge">Отклонено</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark status-badge">На рассмотрении</span>
+                                    {% endif %}
+                                </td>
+                                <td class="comment-cell" title="{{ req.comment or '' }}">{{ req.comment or '-' }}</td>
+                                <td>{{ req.request_time }}</td>
+                                <td>
+                                    <a href="{{ url_for('dispatcher_request_detail', request_id=req.id) }}" 
+                                       class="btn btn-sm btn-primary" 
+                                       title="Просмотр и редактирование">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
